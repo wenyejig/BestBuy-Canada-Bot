@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @updateURL    https://raw.githubusercontent.com/wenyejig/BestBuy-Canada-Bot/blob/main/cart.js
 // @downloadURL  https://raw.githubusercontent.com/wenyejig/BestBuy-Canada-Bot/blob/main/cart.js
-// @version      2.1
+// @version      2.1.1
 // @description  全功能库存监控+自动结账+状态提示
 // @author       Wenyejig
 // @match        https://www.bestbuy.ca/*
@@ -135,6 +135,25 @@
         window.addEventListener('beforeunload', () => {
             clearInterval(checkInterval);
         });
+    }
+    function checkStock() {
+        const addToCartBtn = document.querySelector('.addToCartButton:not([disabled])');
+
+        if (addToCartBtn) {
+            addToCartBtn.click();
+            GM_notification({
+                title: "库存可用！",
+                text: "商品已加入购物车",
+                timeout: 3000
+            });
+
+            // 自动跳转购物车
+            setTimeout(() => {
+                window.location.href = 'https://www.bestbuy.ca/en-ca/basket';
+            }, 2000);
+        } else {
+            console.log('定期库存检查...');
+        }
     }
 
     // 购物车页处理（保留原有逻辑）
