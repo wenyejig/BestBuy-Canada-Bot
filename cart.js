@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         BestBuy Canada Bot
 // @namespace    http://tampermonkey.net/
-// @updateURL    https://raw.githubusercontent.com/wenyejig/BestBuy-Canada-Bot/blob/main/cart.js
-// @downloadURL  https://raw.githubusercontent.com/wenyejig/BestBuy-Canada-Bot/blob/main/cart.js
+// @updateURL    https://raw.githubusercontent.com/wenyejig/BestBuy-Canada-Bot/main/cart.js
+// @downloadURL  https://raw.githubusercontent.com/wenyejig/BestBuy-Canada-Bot/main/cart.js
 // @version      2.1.1
 // @description  全功能库存监控+自动结账+状态提示
 // @author       Wenyejig
@@ -112,9 +112,6 @@
             case PAGE.CHECKOUT:
                 handleCheckoutPage();
                 break;
-            case PAGE.LOGIN:
-                handleLoginPage();
-                break;
         }
     }
 
@@ -158,24 +155,54 @@
 
     // 购物车页处理（保留原有逻辑）
     function handleCartPage() {
-        const checkoutBtn = document.querySelector('[data-automation="checkout-button"]');
-        if (checkoutBtn) {
-            humanizedClick(checkoutBtn);
-        } else {
-            handleCheckoutError();
-        }
+        const proceedToCheckout = () => {
+            // 使用增强版按钮定位逻辑
+            const checkoutBtn = document.querySelector(
+                'a[data-automation="continue-to-checkout"]'// 精准定位
+                //   '.checkoutButton_2DdyM > a', // 结构定位
+                // 'a:contains("Continue to Checkout")' // 文本定位
+            );
+
+            if (checkoutBtn) {
+                console.log('检测到结账按钮，准备跳转');
+                humanizedClick(checkoutBtn);
+            } else {
+                console.warn('未找到结账按钮，等待页面加载...');
+                setTimeout(proceedToCheckout, 2000);
+            }
+        };
+
+        // 首次尝试
+        proceedToCheckout();
+
+        // 新增SPA页面监听
+        const observer = new MutationObserver(() => proceedToCheckout());
+        observer.observe(document.body, { childList: true, subtree: true });
     }
 
     // 结账页处理（保留年龄验证逻辑）
     function handleCheckoutPage() {
-        handleAgeVerification();
-        autoFillPaymentInfo();
+        // 分阶段处理逻辑
+        const processCheckoutSteps = () => {
+            if (closeAgeGate()) {
+                setTimeout(processCheckoutSteps, 1000);
+                return;
+            }
+
+            // 支付信息自动填充逻辑
+            autoFillPaymentInfo();
+
+            // 最终确认按钮
+            const confirmBtn = document.querySelector('[data-automation="place-order-button"]');
+            if (confirmBtn) {
+                humanizedClick(confirmBtn);
+            }
+        };
+
+        // 启动处理流程
+        setTimeout(processCheckoutSteps, 3000);
     }
 
-    // 登录页处理（保留自动填充）
-    function handleLoginPage() {
-        autoFillLoginForm();
-    }
 
     // --- 新增功能模块 ---
     // 状态面板管理
@@ -242,7 +269,40 @@
                     path.includes('/checkout') ? PAGE.CHECKOUT :
                         path.includes('/signin') ? PAGE.LOGIN : null;
     }
+    // 模拟人类点击行为（带随机轨迹）
+    function humanizedClick(element) {
+        if (!element || !element.isConnected) return;
 
+        // 使用安全的方式获取 window 对象
+        const safeWindow = element.ownerDocument.defaultView || window;
+
+        // 创建更规范的事件参数
+        const eventParams = {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            clientX: element.getBoundingClientRect().left + element.offsetWidth / 2,
+            clientY: element.getBoundingClientRect().top + element.offsetHeight / 2,
+            // 不再显式设置 view 属性
+            // 浏览器会自动从当前上下文推断
+        };
+
+        // 分阶段触发事件
+        element.dispatchEvent(new MouseEvent('mouseover', eventParams));
+        element.dispatchEvent(new MouseEvent('mousedown', eventParams));
+        element.dispatchEvent(new MouseEvent('mouseup', eventParams));
+        element.dispatchEvent(new MouseEvent('click', eventParams));
+
+        // 添加随机行为干扰
+        setTimeout(() => {
+            element.blur();
+            window.scrollBy({
+                left: Math.random() * 10 - 5,
+                top: Math.random() * 10 - 5,
+                behavior: 'smooth'
+            });
+        }, 100);
+    }
     // 初始化执行
     window.addEventListener('load', () => {
         setTimeout(init, 3000); // 等待页面稳定
