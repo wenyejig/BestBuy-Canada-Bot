@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @updateURL    https://raw.githubusercontent.com/wenyejig/BestBuy-Canada-Bot/main/cart.js
 // @downloadURL  https://raw.githubusercontent.com/wenyejig/BestBuy-Canada-Bot/main/cart.js
-// @version      2.1.1
+// @version      2.1.2
 // @description  全功能库存监控+自动结账+状态提示
 // @author       Wenyejig
 // @match        https://www.bestbuy.ca/*
@@ -45,6 +45,7 @@
 
     // 全局状态
     let state = {
+        countdown: 0,
         runtime: 0,
         attempts: 0,
         lastRefresh: 0,
@@ -236,9 +237,11 @@
                 window.location.reload();
             }
         };
+        //重置时间计数器
+        state.countdown = config.checkInterval / 1000;
 
         setInterval(refresh, config.checkInterval);
-        updateStatus(`将在 ${config.checkInterval / 1000} 秒后刷新`);
+        updateStatus(`将在 ${state.countdown} 秒后刷新`);
     }
 
     // 状态持久化
@@ -255,6 +258,7 @@
     function startRuntimeCounter() {
         setInterval(() => {
             state.runtime++;
+            state.countdown--;
             document.getElementById('status-runtime').textContent =
                 `已运行: ${Math.floor(state.runtime / 60)}分${state.runtime % 60}秒`;
         }, 1000);
