@@ -135,8 +135,8 @@
         });
     }
     function checkStock() {
-        const addToCartBtn = document.querySelector('.addToCartButton:not([disabled])');
-
+        const addToCartBtn = document.querySelector('.addToCartButton');
+        console.log('checkStock');
         if (addToCartBtn) {
             addToCartBtn.click();
             GM_notification({
@@ -262,7 +262,7 @@
 
             document.getElementById('status-runtime').textContent =
                 `已运行: ${Math.floor(state.runtime / 60)}分${state.runtime % 60}秒`;
-            document.getElementById('status-runtime').textContent =
+            document.getElementById('status-main').textContent =
                 `将在 ${state.countdown} 秒后刷新`;
 
         }, 1000);
@@ -272,9 +272,9 @@
     function detectCurrentPage() {
         const path = window.location.pathname;
         state.currentPage =
-            path.includes('/product/') ? PAGE.PRODUCT :
-                path.includes('/basket') ? PAGE.CART :
-                    path.includes('/checkout') ? PAGE.CHECKOUT :
+            path.includes('/en-ca/product/') ? PAGE.PRODUCT :
+                path.includes('/en-ca/basket/') ? PAGE.CART :
+                    path.includes('/en-ca/checkout') ? PAGE.CHECKOUT :
                         path.includes('/signin') ? PAGE.LOGIN : null;
     }
     // 模拟人类点击行为（带随机轨迹）
