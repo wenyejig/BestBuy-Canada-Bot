@@ -26,6 +26,7 @@
         checkInterval: 60000,
         targetSKU: 'YOUR_SKU',
         autoCheckout: true,
+        maxRandomDelaySeconds: 30, // 设置最大随机延迟秒数 (例如，30秒)
 
         // 新增强制配置
         statusPanel: {
@@ -45,6 +46,7 @@
 
     // 全局状态
     let state = {
+        startTime: 0,
         countdown: 0,
         runtime: 0,
         attempts: 0,
@@ -114,6 +116,7 @@
                 handleCheckoutPage();
                 break;
         }
+        console.log('bot:setupPageHandlers', state.currentPage);
     }
 
     // --- 原有核心功能保持 ---
@@ -136,26 +139,28 @@
     }
     function checkStock() {
         const addToCartBtn = document.querySelector('.addToCartButton');
-        console.log('checkStock');
-        if (addToCartBtn) {
+        console.log('bot:checkStock', addToCartBtn);
+        if (addToCartBtn && (addToCartBtn.disabled || addToCartBtn.classList.contains('disabled'))) {
+            console.log('bot:购物车按钮不可用...');
+        } else if (addToCartBtn) {
             addToCartBtn.click();
-            GM_notification({
-                title: "库存可用！",
-                text: "商品已加入购物车",
-                timeout: 3000
-            });
+            // GM_notification({
+            //     title: "库存可用！",
+            //     text: "商品已加入购物车",
+            //     timeout: 3000
+            // });
 
             // 自动跳转购物车
             setTimeout(() => {
                 window.location.href = 'https://www.bestbuy.ca/en-ca/basket';
             }, 2000);
-        } else {
-            console.log('定期库存检查...');
         }
     }
 
     // 购物车页处理（保留原有逻辑）
     function handleCartPage() {
+
+
         const proceedToCheckout = () => {
             // 使用增强版按钮定位逻辑
             const checkoutBtn = document.querySelector(
@@ -173,8 +178,19 @@
             }
         };
 
-        // 首次尝试
-        proceedToCheckout();
+        // 5秒后 首次尝试
+        const interval = 5;
+        const gotoCheck = setInterval(() => {
+            if (!state.isRunning) return;
+            document.getElementById('status-main').textContent =
+                `${interval}秒后结算...`;
+            if (interval === 0) {
+                clearInterval(gotoCheck);
+                proceedToCheckout();
+            } else {
+                interval--;
+            }
+        }, 1000);
 
         // 新增SPA页面监听
         const observer = new MutationObserver(() => proceedToCheckout());
@@ -183,6 +199,8 @@
 
     // 结账页处理（保留年龄验证逻辑）
     function handleCheckoutPage() {
+        document.getElementById('status-main').textContent =
+            `自动结算，请稍等...`;
         // 分阶段处理逻辑
         const processCheckoutSteps = () => {
             if (closeAgeGate()) {
@@ -208,10 +226,11 @@
     // --- 新增功能模块 ---
     // 状态面板管理
     function initStatusPanel() {
+        console.log('bot:initStatusPanel');
         const panel = document.createElement('div');
         panel.id = 'enhanced-status-panel';
         panel.innerHTML = `
-            <div class="status-header">🛒 自动助手</div>
+            <div class="status-header">🛒 自动助手：运行中</div>
             <div class="status-item" id="status-main">初始化完成</div>
             <div class="status-item" id="status-timer"></div>
             <div class="status-item" id="status-runtime"></div>
@@ -232,6 +251,7 @@
 
     // 自动刷新逻辑
     function setupAutoRefresh() {
+        console.log('bot:setupAutoRefresh');
         const refresh = () => {
             if (state.currentPage === PAGE.PRODUCT && state.isRunning) {
                 window.location.reload();
@@ -240,30 +260,67 @@
         //重置时间计数器
         state.countdown = config.checkInterval / 1000;
 
+        // 生成一个介于 0 和 maxRandomDelaySeconds 之间的随机数
+        const randomDelay = Math.floor(Math.random() * config.maxRandomDelaySeconds);
+
+        // 将随机延迟加到 countdown 上
+        state.countdown += randomDelay;
+
         setInterval(refresh, config.checkInterval);
         updateStatus(`将在 ${state.countdown} 秒后刷新`);
     }
 
     // 状态持久化
     function saveState() {
-        GM_setValue('enhancedState', JSON.stringify(state));
+        const timeState = {
+            startTime: state.startTime,
+            lastRefresh: new Date().getTime(),
+        };
+        console.log('bot:saveState', timeState);
+
+        GM_setValue('enhancedState', JSON.stringify(timeState));
     }
 
     function restoreState() {
-        const saved = GM_getValue('enhancedState');
-        if (saved) Object.assign(state, JSON.parse(saved));
+        const savedStr = GM_getValue('enhancedState');
+        if (savedStr) {
+            const saved = JSON.parse(savedStr);
+            console.log('bot:restoreState', saved);
+            if (saved.startTime == 0) {
+                state.startTime = new Date().getTime();
+
+            } else {
+                const exprTime = (new Date().getTime() - saved.lastRefresh) / 1000;
+
+                if (exprTime > config.checkInterval) {
+                    state.startTime = new Date().getTime();
+                } else {
+                    state.startTime = saved.startTime;
+                }
+            }
+
+            console.log('bot:restoreState after startTime', state.startTime);
+        }
     }
+
+
+
 
     // 运行时间计数器
     function startRuntimeCounter() {
+        console.log('bot:startRuntimeCounter');
         setInterval(() => {
             state.runtime++;
-            state.countdown--;
-
+            const runtime = ((new Date().getTime() - state.startTime) / 1000).toFixed(0);
+            console.log('bot:startRuntimeCounter', runtime);
             document.getElementById('status-runtime').textContent =
-                `已运行: ${Math.floor(state.runtime / 60)}分${state.runtime % 60}秒`;
-            document.getElementById('status-main').textContent =
-                `将在 ${state.countdown} 秒后刷新`;
+                `已运行: ${Math.floor(runtime / 60)}分${runtime % 60}秒`;
+            if (state.currentPage === PAGE.PRODUCT && state.isRunning) {
+                state.countdown--;
+                document.getElementById('status-main').textContent =
+                    `将在 ${state.countdown} 秒后刷新`;
+            }
+
 
         }, 1000);
     }
@@ -273,9 +330,10 @@
         const path = window.location.pathname;
         state.currentPage =
             path.includes('/en-ca/product/') ? PAGE.PRODUCT :
-                path.includes('/en-ca/basket/') ? PAGE.CART :
+                path.includes('/en-ca/basket') ? PAGE.CART :
                     path.includes('/en-ca/checkout') ? PAGE.CHECKOUT :
                         path.includes('/signin') ? PAGE.LOGIN : null;
+        console.log('当前页面:', state.currentPage);
     }
     // 模拟人类点击行为（带随机轨迹）
     function humanizedClick(element) {
