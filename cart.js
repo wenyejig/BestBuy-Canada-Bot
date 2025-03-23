@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @updateURL    https://raw.githubusercontent.com/wenyejig/BestBuy-Canada-Bot/main/cart.js
 // @downloadURL  https://raw.githubusercontent.com/wenyejig/BestBuy-Canada-Bot/main/cart.js
-// @version      2.1.4
+// @version      2.1.5
 // @description  全功能库存监控+自动结账+状态提示
 // @author       Wenyejig
 // @match        https://www.bestbuy.ca/*
@@ -19,6 +19,8 @@
 
 (function () {
     'use strict';
+    // 初始化标志
+    let isInitialized = false;
 
     // 全局配置
     const config = {
@@ -92,7 +94,21 @@
         .error-status { color: #FF5555; }
         .success-status { color: #55FF55; }
     `);
-
+    // Play a chime sound to notify the user
+    function playChime() {
+        // You can choose any online sound file.
+        console.log('bot:playChime');
+        const chimeUrl = "https://github.com/kkapuria3/BestBuy-GPU-Bot/blob/dev-v2.5-mem_leak_fix/resources/alert.mp3?raw=true";
+        const audio = new Audio(chimeUrl);
+        audio.play().catch(err => console.error("Audio play failed:", err));
+    }
+    // 路由变化处理器
+    function handleRouteChange() {
+        if (isInitialized) {
+            console.log('检测到路由变化，重新初始化脚本');
+            init();
+        }
+    }
     // 核心初始化
     function init() {
         detectCurrentPage();
@@ -100,6 +116,8 @@
         restoreState();
         setupPageHandlers();
         startRuntimeCounter();
+        isInitialized = true;
+
     }
 
     // 页面处理器
@@ -150,10 +168,12 @@
                 const viewCartConfirn = document.querySelector('[data-automation="view-cart-confirmation"]');
                 if (viewCartConfirn) {
                     if (addToCartBtn.disabled) {
-                        console.log('bot:购物车按钮不可用...');
+                        console.log('bot:跳转购物车按钮不可用...');
                     } else {
-                        document.getElementById('status-message').textContent =
+                        document.getElementById('status-bot-message').textContent =
                             `即将跳转cart....`;
+                        console.log('bot:即将跳转cart...');
+                        humanizedClick(viewCartConfirn);
                     }
                 }
             }, 3000);
@@ -162,7 +182,10 @@
 
     // 购物车页处理（保留原有逻辑）
     function handleCartPage() {
+        playChime();
 
+        document.getElementById('status-bot-message').textContent =
+            ``;
 
         const proceedToCheckout = () => {
             // 使用增强版按钮定位逻辑
@@ -218,10 +241,10 @@
                 autoFillPaymentInfo();
                 setTimeout(() => {
                     // 最终确认按钮
-                    const confirmBtn = document.querySelector('.order-now');
-                    if (confirmBtn) {
-                        humanizedClick(confirmBtn);
-                    }
+                    // const confirmBtn = document.querySelector('.order-now');
+                    // if (confirmBtn) {
+                    //     humanizedClick(confirmBtn);
+                    // }
                 }, 1000);
             }
         };
@@ -248,7 +271,7 @@
         panel.innerHTML = `
             <div class="status-header">🛒 自动助手：运行中</div>
             <div class="status-item" id="status-main">初始化完成</div>
-            <div class="status-item" id="status-message"></div>
+            <div class="status-item" id="status-bot-message"></div>
             <div class="status-item" id="status-runtime"></div>
         `;
         document.body.appendChild(panel);
@@ -386,9 +409,33 @@
             });
         }, 100);
     }
+
+    // 监听路由变化
+    function setupRouteListener() {
+        // 监听 history.pushState 和 history.replaceState
+        const originalPushState = history.pushState;
+        const originalReplaceState = history.replaceState;
+
+        history.pushState = function () {
+            originalPushState.apply(this, arguments);
+            handleRouteChange();
+        };
+
+        history.replaceState = function () {
+            originalReplaceState.apply(this, arguments);
+            handleRouteChange();
+        };
+
+        // 监听 popstate 事件（用户点击后退/前进按钮）
+        window.addEventListener('popstate', handleRouteChange);
+    }
+
     // 初始化执行
     window.addEventListener('load', () => {
-        setTimeout(init, 3000); // 等待页面稳定
+        setTimeout(() => {
+            init();
+            setupRouteListener();
+        }, 3000); // 等待页面稳定
     });
 
     // 清理状态
