@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @updateURL    https://raw.githubusercontent.com/wenyejig/BestBuy-Canada-Bot/main/cart.js
 // @downloadURL  https://raw.githubusercontent.com/wenyejig/BestBuy-Canada-Bot/main/cart.js
-// @version      2.1.3
+// @version      2.1.4
 // @description  全功能库存监控+自动结账+状态提示
 // @author       Wenyejig
 // @match        https://www.bestbuy.ca/*
@@ -144,16 +144,19 @@
             console.log('bot:购物车按钮不可用...');
         } else if (addToCartBtn) {
             addToCartBtn.click();
-            // GM_notification({
-            //     title: "库存可用！",
-            //     text: "商品已加入购物车",
-            //     timeout: 3000
-            // });
 
             // 自动跳转购物车
             setTimeout(() => {
-                window.location.href = 'https://www.bestbuy.ca/en-ca/basket';
-            }, 2000);
+                const viewCartConfirn = document.querySelector('[data-automation="view-cart-confirmation"]');
+                if (viewCartConfirn) {
+                    if (addToCartBtn.disabled) {
+                        console.log('bot:购物车按钮不可用...');
+                    } else {
+                        document.getElementById('status-message').textContent =
+                            `即将跳转cart....`;
+                    }
+                }
+            }, 3000);
         }
     }
 
@@ -203,23 +206,36 @@
             `自动结算，请稍等...`;
         // 分阶段处理逻辑
         const processCheckoutSteps = () => {
-            if (closeAgeGate()) {
-                setTimeout(processCheckoutSteps, 1000);
-                return;
-            }
-
-            // 支付信息自动填充逻辑
-            autoFillPaymentInfo();
-
-            // 最终确认按钮
-            const confirmBtn = document.querySelector('[data-automation="place-order-button"]');
-            if (confirmBtn) {
-                humanizedClick(confirmBtn);
+            const cvvInput = document.getElementById('cvv');
+            if (cvvInput) {
+                setTimeout(() => {
+                    document.getElementById('status-message').textContent =
+                        `未找到CVV输入框，等待页面加载完成...`;
+                    processCheckoutSteps();
+                }, 3000);
+            } else {
+                // 支付信息自动填充逻辑
+                autoFillPaymentInfo();
+                setTimeout(() => {
+                    // 最终确认按钮
+                    const confirmBtn = document.querySelector('.order-now');
+                    if (confirmBtn) {
+                        humanizedClick(confirmBtn);
+                    }
+                }, 1000);
             }
         };
-
+        //支付信息自动填充逻辑
+        const autoFillPaymentInfo = () => {
+            const cvvInput = document.getElementById('cvv');
+            if (cvvInput) {
+                cvvInput.value = "cvv";
+                cvvInput.dispatchEvent(new Event('input', { bubbles: true }));
+                cvvInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
         // 启动处理流程
-        setTimeout(processCheckoutSteps, 3000);
+        setTimeout(processCheckoutSteps, 1000);
     }
 
 
@@ -232,7 +248,7 @@
         panel.innerHTML = `
             <div class="status-header">🛒 自动助手：运行中</div>
             <div class="status-item" id="status-main">初始化完成</div>
-            <div class="status-item" id="status-timer"></div>
+            <div class="status-item" id="status-message"></div>
             <div class="status-item" id="status-runtime"></div>
         `;
         document.body.appendChild(panel);
@@ -248,6 +264,7 @@
             }`;
         statusEl.textContent = message;
     }
+
 
     // 自动刷新逻辑
     function setupAutoRefresh() {
@@ -291,7 +308,7 @@
 
             } else {
                 const exprTime = (new Date().getTime() - saved.lastRefresh) / 1000;
-
+                console.log('bot:exprTime', exprTime);
                 if (exprTime > config.checkInterval) {
                     state.startTime = new Date().getTime();
                 } else {
