@@ -170,8 +170,7 @@
                     if (addToCartBtn.disabled) {
                         console.log('bot:跳转购物车按钮不可用...');
                     } else {
-                        document.getElementById('status-bot-message').textContent =
-                            `即将跳转cart....`;
+
                         console.log('bot:即将跳转cart...');
                         humanizedClick(viewCartConfirn);
                     }
@@ -182,12 +181,12 @@
 
     // 购物车页处理（保留原有逻辑）
     function handleCartPage() {
-        playChime();
 
-        document.getElementById('status-bot-message').textContent =
-            ``;
+        document.getElementById('status-bot-message').textContent = ``;
 
         const proceedToCheckout = () => {
+            console.log('bot:handleCartPage proceedToCheckout');
+
             // 使用增强版按钮定位逻辑
             const checkoutBtn = document.querySelector(
                 'a[data-automation="continue-to-checkout"]'// 精准定位
@@ -205,60 +204,26 @@
         };
 
         // 5秒后 首次尝试
-        const interval = 5;
+        let expTimes = 5;
+
+
         const gotoCheck = setInterval(() => {
             if (!state.isRunning) return;
             document.getElementById('status-main').textContent =
-                `${interval}秒后结算...`;
-            if (interval === 0) {
+                `${expTimes}秒后结算...`;
+            if (expTimes === 0) {
                 clearInterval(gotoCheck);
                 proceedToCheckout();
             } else {
-                interval--;
+                expTimes--;
             }
         }, 1000);
-
-        // 新增SPA页面监听
-        const observer = new MutationObserver(() => proceedToCheckout());
-        observer.observe(document.body, { childList: true, subtree: true });
     }
 
     // 结账页处理（保留年龄验证逻辑）
     function handleCheckoutPage() {
-        document.getElementById('status-main').textContent =
-            `自动结算，请稍等...`;
-        // 分阶段处理逻辑
-        const processCheckoutSteps = () => {
-            const cvvInput = document.getElementById('cvv');
-            if (cvvInput) {
-                setTimeout(() => {
-                    document.getElementById('status-message').textContent =
-                        `未找到CVV输入框，等待页面加载完成...`;
-                    processCheckoutSteps();
-                }, 3000);
-            } else {
-                // 支付信息自动填充逻辑
-                autoFillPaymentInfo();
-                setTimeout(() => {
-                    // 最终确认按钮
-                    // const confirmBtn = document.querySelector('.order-now');
-                    // if (confirmBtn) {
-                    //     humanizedClick(confirmBtn);
-                    // }
-                }, 1000);
-            }
-        };
-        //支付信息自动填充逻辑
-        const autoFillPaymentInfo = () => {
-            const cvvInput = document.getElementById('cvv');
-            if (cvvInput) {
-                cvvInput.value = "cvv";
-                cvvInput.dispatchEvent(new Event('input', { bubbles: true }));
-                cvvInput.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-        }
-        // 启动处理流程
-        setTimeout(processCheckoutSteps, 1000);
+        playChime();
+
     }
 
 
@@ -266,6 +231,10 @@
     // 状态面板管理
     function initStatusPanel() {
         console.log('bot:initStatusPanel');
+        const exitPanel = document.getElementById('enhanced-status-panel');
+        if (exitPanel) {
+            return;
+        }
         const panel = document.createElement('div');
         panel.id = 'enhanced-status-panel';
         panel.innerHTML = `
@@ -371,7 +340,7 @@
         state.currentPage =
             path.includes('/en-ca/product/') ? PAGE.PRODUCT :
                 path.includes('/en-ca/basket') ? PAGE.CART :
-                    path.includes('/en-ca/checkout') ? PAGE.CHECKOUT :
+                    path.includes('/checkout') ? PAGE.CHECKOUT :
                         path.includes('/signin') ? PAGE.LOGIN : null;
         console.log('当前页面:', state.currentPage);
     }
